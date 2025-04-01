@@ -10,6 +10,10 @@ type MultiHandler struct {
 	handlers []slog.Handler
 }
 
+func NewMultiHandler(handlers []slog.Handler) *MultiHandler {
+	return &MultiHandler{handlers: handlers}
+}
+
 func (m *MultiHandler) WithAttrs(attrs []slog.Attr) slog.Handler {
 	newHandlers := make([]slog.Handler, len(m.handlers))
 	for i, h := range m.handlers {
