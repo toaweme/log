@@ -25,6 +25,7 @@ var levelNames = map[slog.Leveler]string{
 
 func init() {
 	level.Set(slog.LevelDebug)
+
 	opts := &slog.HandlerOptions{
 		Level: level,
 		ReplaceAttr: func(groups []string, a slog.Attr) slog.Attr {
@@ -34,13 +35,14 @@ func init() {
 				if !exists {
 					levelLabel = level.String()
 				}
-				
+
 				a.Value = slog.StringValue(levelLabel)
 			}
-			
+
 			return a
 		},
 	}
+
 	SetLogger(slog.New(slog.NewTextHandler(os.Stdout, opts)))
 }
 
