@@ -23,27 +23,26 @@ var levelNames = map[slog.Leveler]string{
 	LevelFatal: "FATAL",
 }
 
-func init() {
-	level.Set(slog.LevelDebug)
-
-	opts := &slog.HandlerOptions{
-		Level: level,
-		ReplaceAttr: func(groups []string, a slog.Attr) slog.Attr {
-			if a.Key == slog.LevelKey {
-				level := a.Value.Any().(slog.Level)
-				levelLabel, exists := levelNames[level]
-				if !exists {
-					levelLabel = level.String()
-				}
-
-				a.Value = slog.StringValue(levelLabel)
+var DefaultLoggerOptions = &slog.HandlerOptions{
+	Level: level,
+	ReplaceAttr: func(groups []string, a slog.Attr) slog.Attr {
+		if a.Key == slog.LevelKey {
+			level := a.Value.Any().(slog.Level)
+			levelLabel, exists := levelNames[level]
+			if !exists {
+				levelLabel = level.String()
 			}
 
-			return a
-		},
-	}
+			a.Value = slog.StringValue(levelLabel)
+		}
 
-	SetLogger(slog.New(slog.NewTextHandler(os.Stdout, opts)))
+		return a
+	},
+}
+
+func init() {
+	level.Set(slog.LevelDebug)
+	SetLogger(slog.New(slog.NewTextHandler(os.Stdout, DefaultLoggerOptions)))
 }
 
 func SetLogger(newLogger *slog.Logger) {
