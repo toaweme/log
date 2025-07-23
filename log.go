@@ -7,6 +7,17 @@ import (
 	"sync"
 )
 
+type Slog interface {
+	slog.Handler
+	With(args ...any) Slog
+	Error(msg string, args ...any)
+	Info(msg string, args ...any)
+	Debug(msg string, args ...any)
+	Warn(msg string, args ...any)
+	Trace(msg string, args ...any)
+	Fatal(msg string, args ...any)
+}
+
 var (
 	level  = new(slog.LevelVar)
 	Logger *slog.Logger
