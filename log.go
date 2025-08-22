@@ -36,6 +36,7 @@ var levelNames = map[slog.Leveler]string{
 
 var DefaultLoggerOptions = &slog.HandlerOptions{
 	Level: level,
+	// AddSource: true,
 	ReplaceAttr: func(groups []string, a slog.Attr) slog.Attr {
 		if a.Key == slog.LevelKey {
 			level := a.Value.Any().(slog.Level)
