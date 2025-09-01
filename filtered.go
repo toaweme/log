@@ -3,6 +3,7 @@ package log
 import (
 	"context"
 	"log/slog"
+	"strings"
 	"sync"
 )
 
@@ -218,8 +219,22 @@ func (f *FilteredLogger) matchesFilter(record slog.Record, filter Filter) bool {
 			return true
 		})
 
-		for key, value := range filter.Attributes {
-			if recordAttrs[key] != value {
+		for filterKey, filterValue := range filter.Attributes {
+			if strings.HasSuffix(filterKey, "*") {
+				prefix := strings.TrimSuffix(filterKey, "*")
+				matched := false
+				for recordKey, recordValue := range recordAttrs {
+					if strings.HasPrefix(recordKey, prefix) && recordValue == filterValue {
+						matched = true
+						break
+					}
+				}
+				if !matched {
+					return false
+				}
+				continue
+			}
+			if recordAttrs[filterKey] != filterValue {
 				return false
 			}
 		}
