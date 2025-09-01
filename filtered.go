@@ -219,12 +219,19 @@ func (f *FilteredLogger) matchesFilter(record slog.Record, filter Filter) bool {
 			return true
 		})
 
+		// {
+		//		Action:     log.Deny,
+		//		Attributes: map[string]string{
+		//		"url": "https://api.awee.ai/v1/ai/models*"
+		//		},
+		//	},
+
 		for filterKey, filterValue := range filter.Attributes {
-			if strings.HasSuffix(filterKey, "*") {
-				prefix := strings.TrimSuffix(filterKey, "*")
+			if strings.HasSuffix(filterValue, "*") {
+				valuePrefix := strings.TrimSuffix(filterValue, "*")
 				matched := false
 				for recordKey, recordValue := range recordAttrs {
-					if strings.HasPrefix(recordKey, prefix) && recordValue == filterValue {
+					if filterKey == recordKey && strings.HasPrefix(recordValue, valuePrefix) {
 						matched = true
 						break
 					}
