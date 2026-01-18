@@ -3,22 +3,60 @@ package log
 import (
 	"context"
 	"log/slog"
+	"os"
 )
 
 // ExtendedLogger wraps *slog.Logger to implement our Slog interface
 type ExtendedLogger struct {
 	logger *slog.Logger
+	attrs  []any
 }
 
 func NewExtendedLogger(logger *slog.Logger) *ExtendedLogger {
-	return &ExtendedLogger{logger: logger}
+	return &ExtendedLogger{
+		logger: logger,
+		attrs:  []any{},
+	}
 }
 
 var _ Slog = (*ExtendedLogger)(nil)
 
 func (l *ExtendedLogger) With(args ...any) Slog {
+	newAttrs := make([]any, len(l.attrs)+len(args))
+	copy(newAttrs, l.attrs)
+	copy(newAttrs[len(l.attrs):], args)
+
 	return &ExtendedLogger{
 		logger: l.logger.With(args...),
+		attrs:  newAttrs,
+	}
+}
+
+// WithLevel creates a new logger with a different level
+func (l *ExtendedLogger) WithLevel(level slog.Level) Slog {
+	// Create new handler with the specified level
+	var handler slog.Handler
+
+	// Try to determine the handler type and recreate it
+	// This is a simple approach - you might want to make this more sophisticated
+	switch l.logger.Handler().(type) {
+	case *slog.JSONHandler:
+		handler = slog.NewJSONHandler(os.Stdout, CreateLoggerOptions(level))
+	default:
+		handler = slog.NewTextHandler(os.Stdout, CreateLoggerOptions(level))
+	}
+
+	// Create new logger with the new handler
+	newLogger := slog.New(handler)
+
+	// Re-apply any stored attributes
+	if len(l.attrs) > 0 {
+		newLogger = newLogger.With(l.attrs...)
+	}
+
+	return &ExtendedLogger{
+		logger: newLogger,
+		attrs:  l.attrs,
 	}
 }
 

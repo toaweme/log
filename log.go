@@ -10,6 +10,7 @@ import (
 type Slog interface {
 	slog.Handler
 	With(args ...any) Slog
+	WithLevel(level slog.Level) Slog
 	Error(msg string, args ...any)
 	Info(msg string, args ...any)
 	Debug(msg string, args ...any)
@@ -34,22 +35,24 @@ var levelNames = map[slog.Leveler]string{
 	LevelFatal: "FATAL",
 }
 
+var attrFunc = func(groups []string, a slog.Attr) slog.Attr {
+	if a.Key == slog.LevelKey {
+		level := a.Value.Any().(slog.Level)
+		levelLabel, exists := levelNames[level]
+		if !exists {
+			levelLabel = level.String()
+		}
+
+		a.Value = slog.StringValue(levelLabel)
+	}
+
+	return a
+}
+
 var DefaultLoggerOptions = &slog.HandlerOptions{
 	Level: level,
 	// AddSource: true,
-	ReplaceAttr: func(groups []string, a slog.Attr) slog.Attr {
-		if a.Key == slog.LevelKey {
-			level := a.Value.Any().(slog.Level)
-			levelLabel, exists := levelNames[level]
-			if !exists {
-				levelLabel = level.String()
-			}
-
-			a.Value = slog.StringValue(levelLabel)
-		}
-
-		return a
-	},
+	ReplaceAttr: attrFunc,
 }
 
 func init() {
@@ -73,6 +76,14 @@ func GetLevel() *slog.LevelVar {
 	mu.RLock()
 	defer mu.RUnlock()
 	return level
+}
+
+// CreateLoggerOptions creates handler options with a specific level
+func CreateLoggerOptions(lvl slog.Level) *slog.HandlerOptions {
+	return &slog.HandlerOptions{
+		Level:       lvl,
+		ReplaceAttr: attrFunc,
+	}
 }
 
 var (
