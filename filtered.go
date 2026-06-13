@@ -7,12 +7,12 @@ import (
 	"sync"
 )
 
-// FilterAction is what a matching Filter does to a record.
-type FilterAction int
+// filterAction is what a matching Filter does to a record.
+type filterAction int
 
 const (
 	// allow passes the record through unchanged (the zero value).
-	allow FilterAction = iota
+	allow filterAction = iota
 	// deny drops the record so no downstream handler sees it.
 	deny
 	// shorten truncates the values of the configured attribute keys.
@@ -28,7 +28,7 @@ const (
 // A record must match every set criterion (level, message, attributes) for the
 // filter's action to apply; criteria left unset are ignored.
 type Filter struct {
-	action      FilterAction
+	action      filterAction
 	message     string
 	attributes  map[string]string
 	level       *slog.Level
