@@ -3,6 +3,7 @@ package log
 import (
 	"context"
 	"log/slog"
+	"sync"
 	"testing"
 )
 
@@ -83,6 +84,30 @@ func Test_FilteredLogger_matchesFilter(t *testing.T) {
 			name:   "match against synthetic msg attribute",
 			filter: Allow().Attr("msg", "health*"),
 			record: newRecord(slog.LevelInfo, "healthcheck ok"),
+			want:   true,
+		},
+		{
+			name:   "bare wildcard matches any present value",
+			filter: Allow().Attr("path", "*"),
+			record: newRecord(slog.LevelInfo, "hi", "path", "/anything"),
+			want:   true,
+		},
+		{
+			name:   "bare wildcard does not match an absent key",
+			filter: Allow().Attr("path", "*"),
+			record: newRecord(slog.LevelInfo, "hi", "other", "x"),
+			want:   false,
+		},
+		{
+			name:   "wildcard prefix does not match an absent key",
+			filter: Allow().Attr("path", "/api/*"),
+			record: newRecord(slog.LevelInfo, "hi"),
+			want:   false,
+		},
+		{
+			name:   "wildcard matches a present empty value when prefix is empty",
+			filter: Allow().Attr("path", "*"),
+			record: newRecord(slog.LevelInfo, "hi", "path", ""),
 			want:   true,
 		},
 		{
@@ -258,6 +283,8 @@ func Test_shortenMessage(t *testing.T) {
 		{"over limit with ellipsis", "abcdefgh", 6, "abc..."},
 		{"tiny limit no room for ellipsis", "abcdef", 3, "abc"},
 		{"zero limit", "abcdef", 0, ""},
+		{"negative limit does not panic", "abcdef", -5, ""},
+		{"negative limit on empty string", "", -5, ""},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -266,6 +293,47 @@ func Test_shortenMessage(t *testing.T) {
 			}
 		})
 	}
+}
+
+func Test_FilteredLogger_Handle_ShortenNegativeLimit(t *testing.T) {
+	down := newRecHandler(LevelTrace)
+	fl := NewFilteredLogger(down, Shorten("body").Limit(-5))
+
+	rec := newRecord(slog.LevelInfo, "msg", "body", "0123456789")
+	if err := fl.Handle(context.Background(), rec); err != nil {
+		t.Fatalf("Handle() returned error: %v", err)
+	}
+
+	got := attrsOf(down.seen()[0])
+	if got["body"] != "" {
+		t.Fatalf("body = %q, want %q (negative limit shortens to empty, not panic)", got["body"], "")
+	}
+}
+
+// Test_FilteredLogger_ConcurrentWithAndAddFilter exercises the lock around the
+// filter slice: WithAttrs/WithGroup read it while AddFilter mutates it. Run with
+// -race to catch an unguarded read.
+func Test_FilteredLogger_ConcurrentWithAndAddFilter(t *testing.T) {
+	fl := NewFilteredLogger(noopHandler{})
+
+	var wg sync.WaitGroup
+	for i := 0; i < 8; i++ {
+		wg.Add(2)
+		go func() {
+			defer wg.Done()
+			for j := 0; j < 200; j++ {
+				fl.AddFilter(Deny().Message("x"))
+			}
+		}()
+		go func() {
+			defer wg.Done()
+			for j := 0; j < 200; j++ {
+				_ = fl.WithAttrs([]slog.Attr{slog.String("k", "v")})
+				_ = fl.WithGroup("g")
+			}
+		}()
+	}
+	wg.Wait()
 }
 
 func Test_FilteredLogger_AddAndSetFilters(t *testing.T) {

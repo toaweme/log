@@ -96,6 +96,17 @@ func (h *fakeHandler) messages() []string {
 	return append([]string{}, *h.handled...)
 }
 
+// noopHandler discards everything and allocates nothing, so benchmarks measure
+// the handler under test rather than the sink.
+type noopHandler struct{}
+
+var _ slog.Handler = noopHandler{}
+
+func (noopHandler) Enabled(context.Context, slog.Level) bool  { return true }
+func (noopHandler) Handle(context.Context, slog.Record) error { return nil }
+func (h noopHandler) WithAttrs([]slog.Attr) slog.Handler      { return h }
+func (h noopHandler) WithGroup(string) slog.Handler           { return h }
+
 // attrsOf flattens a record's attributes into a key/value map for assertions.
 func attrsOf(r slog.Record) map[string]string {
 	out := make(map[string]string)

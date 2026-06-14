@@ -111,6 +111,9 @@ func shortenMessage(msg string, limit int) string {
 		return msg
 	}
 	if limit <= 3 {
+		if limit < 0 {
+			return ""
+		}
 		return msg[:limit]
 	}
 	return msg[:limit-3] + "..."
@@ -169,6 +172,8 @@ func (f *FilteredLogger) Handle(ctx context.Context, record slog.Record) error {
 // WithAttrs returns a new FilteredLogger sharing the same filters, with attrs
 // applied to the wrapped handler.
 func (f *FilteredLogger) WithAttrs(attrs []slog.Attr) slog.Handler {
+	f.mu.RLock()
+	defer f.mu.RUnlock()
 	return &FilteredLogger{
 		handler: f.handler.WithAttrs(attrs),
 		filters: f.filters,
@@ -178,6 +183,8 @@ func (f *FilteredLogger) WithAttrs(attrs []slog.Attr) slog.Handler {
 // WithGroup returns a new FilteredLogger sharing the same filters, with the
 // named group applied to the wrapped handler.
 func (f *FilteredLogger) WithGroup(name string) slog.Handler {
+	f.mu.RLock()
+	defer f.mu.RUnlock()
 	return &FilteredLogger{
 		handler: f.handler.WithGroup(name),
 		filters: f.filters,
@@ -217,21 +224,14 @@ func (f *FilteredLogger) matchesFilter(record slog.Record, filter Filter) bool {
 		})
 
 		for filterKey, filterValue := range filter.attributes {
-			if strings.HasSuffix(filterValue, "*") {
-				valuePrefix := strings.TrimSuffix(filterValue, "*")
-				matched := false
-				for recordKey, recordValue := range recordAttrs {
-					if filterKey == recordKey && strings.HasPrefix(recordValue, valuePrefix) {
-						matched = true
-						break
-					}
-				}
-				if !matched {
+			recordValue, present := recordAttrs[filterKey]
+			if valuePrefix, isPrefix := strings.CutSuffix(filterValue, "*"); isPrefix {
+				if !present || !strings.HasPrefix(recordValue, valuePrefix) {
 					return false
 				}
 				continue
 			}
-			if recordAttrs[filterKey] != filterValue {
+			if recordValue != filterValue {
 				return false
 			}
 		}
