@@ -11,7 +11,7 @@ import (
 
 func Test_Logger_WithLevel_PreservesWriterAndFormat(t *testing.T) {
 	var buf bytes.Buffer
-	base := slog.New(slog.NewJSONHandler(&buf, Options(LevelTrace)))
+	base := slog.New(slog.NewJSONHandler(&buf, HandlerOptions(LevelTrace)))
 	logger := Wrap(base)
 
 	// raise the threshold to Error; the writer and JSON format must be kept.
@@ -40,7 +40,7 @@ func Test_Logger_WithLevel_PreservesWriterAndFormat(t *testing.T) {
 
 func Test_Logger_WithLevel_CanWidenAgain(t *testing.T) {
 	var buf bytes.Buffer
-	base := slog.New(slog.NewTextHandler(&buf, Options(LevelTrace)))
+	base := slog.New(slog.NewTextHandler(&buf, HandlerOptions(LevelTrace)))
 	logger := Wrap(base)
 
 	narrowed := logger.WithLevel(slog.LevelError)
@@ -54,7 +54,7 @@ func Test_Logger_WithLevel_CanWidenAgain(t *testing.T) {
 
 func Test_Logger_With_AddsAttributes(t *testing.T) {
 	var buf bytes.Buffer
-	base := slog.New(slog.NewJSONHandler(&buf, Options(LevelTrace)))
+	base := slog.New(slog.NewJSONHandler(&buf, HandlerOptions(LevelTrace)))
 	logger := Wrap(base).With("svc", "api")
 
 	logger.Info("hello")
@@ -81,7 +81,7 @@ func Test_Logger_CustomLevels(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			var buf bytes.Buffer
-			base := slog.New(slog.NewJSONHandler(&buf, Options(LevelTrace)))
+			base := slog.New(slog.NewJSONHandler(&buf, HandlerOptions(LevelTrace)))
 			logger := Wrap(base)
 
 			tt.log(logger)
@@ -123,4 +123,22 @@ func Test_Logger_Slog_RoundTrips(t *testing.T) {
 	if logger.Slog() != base {
 		t.Fatal("Slog() did not return the wrapped *slog.Logger")
 	}
+}
+
+func Test_Discard_DropsEverythingAndDisablesAllLevels(t *testing.T) {
+	l := Discard()
+
+	levels := []slog.Level{LevelTrace, slog.LevelDebug, slog.LevelInfo, slog.LevelWarn, slog.LevelError, LevelFatal}
+	for _, lv := range levels {
+		if l.Enabled(context.Background(), lv) {
+			t.Fatalf("Enabled(%v) = true, want false", lv)
+		}
+	}
+
+	// these must not panic and must produce no output.
+	l.Info("i")
+	l.Error("e")
+	l.With("k", "v").Warn("w")
+	l.Trace("t")
+	l.Fatal("f")
 }

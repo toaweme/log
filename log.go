@@ -60,9 +60,9 @@ func renameLevels(_ []string, a slog.Attr) slog.Attr {
 	return a
 }
 
-// Options returns slog.HandlerOptions wired to level with the custom-level name
-// rendering, for building raw handlers passed to Output.
-func Options(level slog.Leveler) *slog.HandlerOptions {
+// HandlerOptions returns slog.HandlerOptions wired to level with the custom-level
+// name rendering, for building raw handlers passed to WithOutput.
+func HandlerOptions(level slog.Leveler) *slog.HandlerOptions {
 	return &slog.HandlerOptions{Level: level, ReplaceAttr: renameLevels}
 }
 
@@ -79,7 +79,7 @@ type builder struct {
 func WithText(w io.Writer) Option {
 	return func(b *builder) {
 		b.outputs = append(b.outputs, func(lv *slog.LevelVar) slog.Handler {
-			return slog.NewTextHandler(w, Options(lv))
+			return slog.NewTextHandler(w, HandlerOptions(lv))
 		})
 	}
 }
@@ -89,7 +89,7 @@ func WithText(w io.Writer) Option {
 func WithJSON(w io.Writer) Option {
 	return func(b *builder) {
 		b.outputs = append(b.outputs, func(lv *slog.LevelVar) slog.Handler {
-			return slog.NewJSONHandler(w, Options(lv))
+			return slog.NewJSONHandler(w, HandlerOptions(lv))
 		})
 	}
 }
@@ -107,7 +107,7 @@ func WithLevel(level slog.Level) Option {
 	return func(b *builder) { b.level.Set(level) }
 }
 
-// WithFilters wraps the assembled outputs in a FilteredLogger.
+// WithFilters wraps the assembled outputs in a FilterHandler.
 func WithFilters(filters ...Filter) Option {
 	return func(b *builder) { b.filters = append(b.filters, filters...) }
 }
@@ -123,7 +123,7 @@ func New(opts ...Option) Logger {
 
 	if len(b.outputs) == 0 {
 		b.outputs = append(b.outputs, func(lv *slog.LevelVar) slog.Handler {
-			return slog.NewTextHandler(os.Stdout, Options(lv))
+			return slog.NewTextHandler(os.Stdout, HandlerOptions(lv))
 		})
 	}
 
@@ -139,7 +139,7 @@ func New(opts ...Option) Logger {
 		h = NewMultiHandler(handlers...)
 	}
 	if len(b.filters) > 0 {
-		h = NewFilteredLogger(h, b.filters...)
+		h = NewFilterHandler(h, b.filters...)
 	}
 
 	return Wrap(slog.New(h))
@@ -150,6 +150,12 @@ func Wrap(l *slog.Logger) Logger {
 	return &logger{slog: l}
 }
 
+// Discard returns a Logger that drops every record. Useful as a default in
+// tests or libraries that take a Logger but should stay silent.
+func Discard() Logger {
+	return Wrap(slog.New(discardHandler{}))
+}
+
 var (
 	mu          sync.RWMutex
 	globalLevel = new(slog.LevelVar)
@@ -158,7 +164,7 @@ var (
 
 func init() {
 	globalLevel.Set(slog.LevelDebug)
-	defaultLog = Wrap(slog.New(slog.NewTextHandler(os.Stdout, Options(globalLevel))))
+	defaultLog = Wrap(slog.New(slog.NewTextHandler(os.Stdout, HandlerOptions(globalLevel))))
 }
 
 // Default returns the process-wide Logger backing the package-level helpers.

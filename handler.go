@@ -68,6 +68,17 @@ func (l *logger) Fatal(msg string, args ...any) {
 // Slog returns the wrapped *slog.Logger.
 func (l *logger) Slog() *slog.Logger { return l.slog }
 
+// discardHandler drops every record. It reports Enabled false so callers skip
+// building records at all.
+type discardHandler struct{}
+
+var _ slog.Handler = discardHandler{}
+
+func (discardHandler) Enabled(context.Context, slog.Level) bool  { return false }
+func (discardHandler) Handle(context.Context, slog.Record) error { return nil }
+func (h discardHandler) WithAttrs([]slog.Attr) slog.Handler      { return h }
+func (h discardHandler) WithGroup(string) slog.Handler           { return h }
+
 // levelHandler wraps a slog.Handler to enforce a minimum level while delegating
 // everything else, so WithLevel can change the threshold without touching the
 // output destination or format.

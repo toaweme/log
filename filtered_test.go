@@ -124,7 +124,7 @@ func Test_FilteredLogger_matchesFilter(t *testing.T) {
 		},
 	}
 
-	f := &FilteredLogger{}
+	f := &FilterHandler{}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			got := f.matchesFilter(tt.record, tt.filter)
@@ -149,7 +149,7 @@ func Test_Filter_Attr_DoesNotMutateSharedBase(t *testing.T) {
 
 func Test_FilteredLogger_Handle_Deny(t *testing.T) {
 	down := newRecHandler(LevelTrace)
-	fl := NewFilteredLogger(down, Deny().Message("secret"))
+	fl := NewFilterHandler(down, Deny().Message("secret"))
 
 	if err := fl.Handle(context.Background(), newRecord(slog.LevelInfo, "secret")); err != nil {
 		t.Fatalf("Handle() denied record returned error: %v", err)
@@ -169,7 +169,7 @@ func Test_FilteredLogger_Handle_Deny(t *testing.T) {
 
 func Test_FilteredLogger_Handle_DenyBelowLevel(t *testing.T) {
 	down := newRecHandler(LevelTrace)
-	fl := NewFilteredLogger(down, Deny().Below(slog.LevelInfo))
+	fl := NewFilterHandler(down, Deny().Below(slog.LevelInfo))
 
 	_ = fl.Handle(context.Background(), newRecord(slog.LevelDebug, "noise"))
 	_ = fl.Handle(context.Background(), newRecord(slog.LevelInfo, "kept"))
@@ -182,7 +182,7 @@ func Test_FilteredLogger_Handle_DenyBelowLevel(t *testing.T) {
 
 func Test_FilteredLogger_Handle_Allow(t *testing.T) {
 	down := newRecHandler(LevelTrace)
-	fl := NewFilteredLogger(down, Allow())
+	fl := NewFilterHandler(down, Allow())
 
 	if err := fl.Handle(context.Background(), newRecord(slog.LevelInfo, "keep me", "k", "v")); err != nil {
 		t.Fatalf("Handle() returned error: %v", err)
@@ -227,7 +227,7 @@ func Test_FilteredLogger_Handle_Shorten(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			down := newRecHandler(LevelTrace)
-			fl := NewFilteredLogger(down, tt.filter)
+			fl := NewFilterHandler(down, tt.filter)
 
 			rec := newRecord(slog.LevelInfo, "msg", "body", tt.attrIn, "keep", "untouched")
 			if err := fl.Handle(context.Background(), rec); err != nil {
@@ -251,7 +251,7 @@ func Test_FilteredLogger_Handle_Shorten(t *testing.T) {
 
 func Test_FilteredLogger_Handle_ShortenNoDuplicateAttrs(t *testing.T) {
 	down := newRecHandler(LevelTrace)
-	fl := NewFilteredLogger(down, Shorten("body").Limit(5))
+	fl := NewFilterHandler(down, Shorten("body").Limit(5))
 
 	rec := newRecord(slog.LevelInfo, "msg", "body", "0123456789")
 	if err := fl.Handle(context.Background(), rec); err != nil {
@@ -297,7 +297,7 @@ func Test_shortenMessage(t *testing.T) {
 
 func Test_FilteredLogger_Handle_ShortenNegativeLimit(t *testing.T) {
 	down := newRecHandler(LevelTrace)
-	fl := NewFilteredLogger(down, Shorten("body").Limit(-5))
+	fl := NewFilterHandler(down, Shorten("body").Limit(-5))
 
 	rec := newRecord(slog.LevelInfo, "msg", "body", "0123456789")
 	if err := fl.Handle(context.Background(), rec); err != nil {
@@ -314,7 +314,7 @@ func Test_FilteredLogger_Handle_ShortenNegativeLimit(t *testing.T) {
 // filter slice: WithAttrs/WithGroup read it while AddFilter mutates it. Run with
 // -race to catch an unguarded read.
 func Test_FilteredLogger_ConcurrentWithAndAddFilter(t *testing.T) {
-	fl := NewFilteredLogger(noopHandler{})
+	fl := NewFilterHandler(noopHandler{})
 
 	var wg sync.WaitGroup
 	for i := 0; i < 8; i++ {
@@ -338,7 +338,7 @@ func Test_FilteredLogger_ConcurrentWithAndAddFilter(t *testing.T) {
 
 func Test_FilteredLogger_AddAndSetFilters(t *testing.T) {
 	down := newRecHandler(LevelTrace)
-	fl := NewFilteredLogger(down)
+	fl := NewFilterHandler(down)
 
 	// no filters: record passes through.
 	_ = fl.Handle(context.Background(), newRecord(slog.LevelInfo, "one"))

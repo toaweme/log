@@ -34,7 +34,7 @@ func Test_PackageHelpers_RouteToDefaultLogger(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			var buf bytes.Buffer
-			withGlobalLogger(t, slog.NewJSONHandler(&buf, Options(LevelTrace)))
+			withGlobalLogger(t, slog.NewJSONHandler(&buf, HandlerOptions(LevelTrace)))
 
 			tt.log()
 
@@ -56,7 +56,7 @@ func Test_SetLevel_GatesPackageHelpers(t *testing.T) {
 	var buf bytes.Buffer
 	// the default logger built in init is wired to globalLevel, so a handler
 	// wired to the same var reproduces that behavior under SetLevel.
-	withGlobalLogger(t, slog.NewTextHandler(&buf, Options(globalLevel)))
+	withGlobalLogger(t, slog.NewTextHandler(&buf, HandlerOptions(globalLevel)))
 
 	prev := Level()
 	t.Cleanup(func() { SetLevel(prev) })

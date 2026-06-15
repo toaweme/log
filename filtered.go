@@ -79,20 +79,20 @@ func (f Filter) Limit(n int) Filter {
 	return f
 }
 
-// FilteredLogger is a slog.Handler that applies an ordered list of filters to
+// FilterHandler is a slog.Handler that applies an ordered list of filters to
 // each record before passing it to a wrapped handler. Filters run in order; the
 // first Deny match drops the record, and Shorten matches rewrite attributes.
-type FilteredLogger struct {
+type FilterHandler struct {
 	handler slog.Handler
 	filters []Filter
 	mu      sync.RWMutex
 }
 
-var _ slog.Handler = (*FilteredLogger)(nil)
+var _ slog.Handler = (*FilterHandler)(nil)
 
-// NewFilteredLogger wraps handler with the given filters.
-func NewFilteredLogger(handler slog.Handler, filters ...Filter) *FilteredLogger {
-	return &FilteredLogger{
+// NewFilterHandler wraps handler with the given filters.
+func NewFilterHandler(handler slog.Handler, filters ...Filter) *FilterHandler {
+	return &FilterHandler{
 		handler: handler,
 		filters: filters,
 	}
@@ -100,7 +100,7 @@ func NewFilteredLogger(handler slog.Handler, filters ...Filter) *FilteredLogger 
 
 // Enabled reports whether the wrapped handler emits records at level. Filters
 // are evaluated in Handle, not here, since they can match on message or attrs.
-func (f *FilteredLogger) Enabled(ctx context.Context, level slog.Level) bool {
+func (f *FilterHandler) Enabled(ctx context.Context, level slog.Level) bool {
 	return f.handler.Enabled(ctx, level)
 }
 
@@ -121,7 +121,7 @@ func shortenMessage(msg string, limit int) string {
 
 // Handle applies each matching filter to the record and forwards the result to
 // the wrapped handler. A matching Deny returns early and drops the record.
-func (f *FilteredLogger) Handle(ctx context.Context, record slog.Record) error {
+func (f *FilterHandler) Handle(ctx context.Context, record slog.Record) error {
 	f.mu.RLock()
 	defer f.mu.RUnlock()
 
@@ -169,44 +169,44 @@ func (f *FilteredLogger) Handle(ctx context.Context, record slog.Record) error {
 	return f.handler.Handle(ctx, record)
 }
 
-// WithAttrs returns a new FilteredLogger sharing the same filters, with attrs
+// WithAttrs returns a new FilterHandler sharing the same filters, with attrs
 // applied to the wrapped handler.
-func (f *FilteredLogger) WithAttrs(attrs []slog.Attr) slog.Handler {
+func (f *FilterHandler) WithAttrs(attrs []slog.Attr) slog.Handler {
 	f.mu.RLock()
 	defer f.mu.RUnlock()
-	return &FilteredLogger{
+	return &FilterHandler{
 		handler: f.handler.WithAttrs(attrs),
 		filters: f.filters,
 	}
 }
 
-// WithGroup returns a new FilteredLogger sharing the same filters, with the
+// WithGroup returns a new FilterHandler sharing the same filters, with the
 // named group applied to the wrapped handler.
-func (f *FilteredLogger) WithGroup(name string) slog.Handler {
+func (f *FilterHandler) WithGroup(name string) slog.Handler {
 	f.mu.RLock()
 	defer f.mu.RUnlock()
-	return &FilteredLogger{
+	return &FilterHandler{
 		handler: f.handler.WithGroup(name),
 		filters: f.filters,
 	}
 }
 
 // AddFilter appends a filter; safe to call concurrently with logging.
-func (f *FilteredLogger) AddFilter(filter Filter) {
+func (f *FilterHandler) AddFilter(filter Filter) {
 	f.mu.Lock()
 	defer f.mu.Unlock()
 	f.filters = append(f.filters, filter)
 }
 
 // SetFilters replaces the filter list; safe to call concurrently with logging.
-func (f *FilteredLogger) SetFilters(filters []Filter) {
+func (f *FilterHandler) SetFilters(filters []Filter) {
 	f.mu.Lock()
 	defer f.mu.Unlock()
 	f.filters = filters
 }
 
 // matchesFilter reports whether record satisfies every set criterion of filter.
-func (f *FilteredLogger) matchesFilter(record slog.Record, filter Filter) bool {
+func (f *FilterHandler) matchesFilter(record slog.Record, filter Filter) bool {
 	if filter.level != nil && *filter.level <= record.Level {
 		return false
 	}

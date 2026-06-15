@@ -19,7 +19,7 @@ func Benchmark_shortenMessage(b *testing.B) {
 }
 
 func Benchmark_FilteredLogger_matchesFilter_Exact(b *testing.B) {
-	fl := &FilteredLogger{}
+	fl := &FilterHandler{}
 	filter := Allow().Message("request").Attr("user", "bob")
 	rec := newRecord(slog.LevelInfo, "request", "user", "bob", "path", "/api/users")
 	b.ReportAllocs()
@@ -29,7 +29,7 @@ func Benchmark_FilteredLogger_matchesFilter_Exact(b *testing.B) {
 }
 
 func Benchmark_FilteredLogger_matchesFilter_Wildcard(b *testing.B) {
-	fl := &FilteredLogger{}
+	fl := &FilterHandler{}
 	filter := Allow().Attr("path", "/api/*")
 	rec := newRecord(slog.LevelInfo, "request", "user", "bob", "path", "/api/users")
 	b.ReportAllocs()
@@ -39,7 +39,7 @@ func Benchmark_FilteredLogger_matchesFilter_Wildcard(b *testing.B) {
 }
 
 func Benchmark_FilteredLogger_Handle_PassThrough(b *testing.B) {
-	fl := NewFilteredLogger(noopHandler{}, Deny().Message("never"))
+	fl := NewFilterHandler(noopHandler{}, Deny().Message("never"))
 	ctx := context.Background()
 	rec := newRecord(slog.LevelInfo, "request", "user", "bob", "path", "/api/users")
 	b.ReportAllocs()
@@ -49,7 +49,7 @@ func Benchmark_FilteredLogger_Handle_PassThrough(b *testing.B) {
 }
 
 func Benchmark_FilteredLogger_Handle_Deny(b *testing.B) {
-	fl := NewFilteredLogger(noopHandler{}, Deny().Below(slog.LevelInfo))
+	fl := NewFilterHandler(noopHandler{}, Deny().Below(slog.LevelInfo))
 	ctx := context.Background()
 	rec := newRecord(slog.LevelDebug, "noise", "user", "bob")
 	b.ReportAllocs()
@@ -59,7 +59,7 @@ func Benchmark_FilteredLogger_Handle_Deny(b *testing.B) {
 }
 
 func Benchmark_FilteredLogger_Handle_Shorten(b *testing.B) {
-	fl := NewFilteredLogger(noopHandler{}, Shorten("body").Limit(20))
+	fl := NewFilterHandler(noopHandler{}, Shorten("body").Limit(20))
 	ctx := context.Background()
 	rec := newRecord(slog.LevelInfo, "response",
 		"body", "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ",
