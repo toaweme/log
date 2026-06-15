@@ -18,7 +18,7 @@ func Benchmark_shortenMessage(b *testing.B) {
 	}
 }
 
-func Benchmark_FilteredLogger_matchesFilter_Exact(b *testing.B) {
+func Benchmark_FilterHandler_matchesFilter_Exact(b *testing.B) {
 	fl := &FilterHandler{}
 	filter := Allow().Message("request").Attr("user", "bob")
 	rec := newRecord(slog.LevelInfo, "request", "user", "bob", "path", "/api/users")
@@ -28,7 +28,7 @@ func Benchmark_FilteredLogger_matchesFilter_Exact(b *testing.B) {
 	}
 }
 
-func Benchmark_FilteredLogger_matchesFilter_Wildcard(b *testing.B) {
+func Benchmark_FilterHandler_matchesFilter_Wildcard(b *testing.B) {
 	fl := &FilterHandler{}
 	filter := Allow().Attr("path", "/api/*")
 	rec := newRecord(slog.LevelInfo, "request", "user", "bob", "path", "/api/users")
@@ -38,7 +38,7 @@ func Benchmark_FilteredLogger_matchesFilter_Wildcard(b *testing.B) {
 	}
 }
 
-func Benchmark_FilteredLogger_Handle_PassThrough(b *testing.B) {
+func Benchmark_FilterHandler_Handle_PassThrough(b *testing.B) {
 	fl := NewFilterHandler(noopHandler{}, Deny().Message("never"))
 	ctx := context.Background()
 	rec := newRecord(slog.LevelInfo, "request", "user", "bob", "path", "/api/users")
@@ -48,7 +48,7 @@ func Benchmark_FilteredLogger_Handle_PassThrough(b *testing.B) {
 	}
 }
 
-func Benchmark_FilteredLogger_Handle_Deny(b *testing.B) {
+func Benchmark_FilterHandler_Handle_Deny(b *testing.B) {
 	fl := NewFilterHandler(noopHandler{}, Deny().Below(slog.LevelInfo))
 	ctx := context.Background()
 	rec := newRecord(slog.LevelDebug, "noise", "user", "bob")
@@ -58,7 +58,7 @@ func Benchmark_FilteredLogger_Handle_Deny(b *testing.B) {
 	}
 }
 
-func Benchmark_FilteredLogger_Handle_Shorten(b *testing.B) {
+func Benchmark_FilterHandler_Handle_Shorten(b *testing.B) {
 	fl := NewFilterHandler(noopHandler{}, Shorten("body").Limit(20))
 	ctx := context.Background()
 	rec := newRecord(slog.LevelInfo, "response",

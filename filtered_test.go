@@ -7,7 +7,7 @@ import (
 	"testing"
 )
 
-func Test_FilteredLogger_matchesFilter(t *testing.T) {
+func Test_FilterHandler_matchesFilter(t *testing.T) {
 	tests := []struct {
 		name   string
 		filter Filter
@@ -147,7 +147,7 @@ func Test_Filter_Attr_DoesNotMutateSharedBase(t *testing.T) {
 	}
 }
 
-func Test_FilteredLogger_Handle_Deny(t *testing.T) {
+func Test_FilterHandler_Handle_Deny(t *testing.T) {
 	down := newRecHandler(LevelTrace)
 	fl := NewFilterHandler(down, Deny().Message("secret"))
 
@@ -167,7 +167,7 @@ func Test_FilteredLogger_Handle_Deny(t *testing.T) {
 	}
 }
 
-func Test_FilteredLogger_Handle_DenyBelowLevel(t *testing.T) {
+func Test_FilterHandler_Handle_DenyBelowLevel(t *testing.T) {
 	down := newRecHandler(LevelTrace)
 	fl := NewFilterHandler(down, Deny().Below(slog.LevelInfo))
 
@@ -180,7 +180,7 @@ func Test_FilteredLogger_Handle_DenyBelowLevel(t *testing.T) {
 	}
 }
 
-func Test_FilteredLogger_Handle_Allow(t *testing.T) {
+func Test_FilterHandler_Handle_Allow(t *testing.T) {
 	down := newRecHandler(LevelTrace)
 	fl := NewFilterHandler(down, Allow())
 
@@ -197,7 +197,7 @@ func Test_FilteredLogger_Handle_Allow(t *testing.T) {
 	}
 }
 
-func Test_FilteredLogger_Handle_Shorten(t *testing.T) {
+func Test_FilterHandler_Handle_Shorten(t *testing.T) {
 	tests := []struct {
 		name    string
 		filter  Filter
@@ -249,7 +249,7 @@ func Test_FilteredLogger_Handle_Shorten(t *testing.T) {
 	}
 }
 
-func Test_FilteredLogger_Handle_ShortenNoDuplicateAttrs(t *testing.T) {
+func Test_FilterHandler_Handle_ShortenNoDuplicateAttrs(t *testing.T) {
 	down := newRecHandler(LevelTrace)
 	fl := NewFilterHandler(down, Shorten("body").Limit(5))
 
@@ -295,7 +295,7 @@ func Test_shortenMessage(t *testing.T) {
 	}
 }
 
-func Test_FilteredLogger_Handle_ShortenNegativeLimit(t *testing.T) {
+func Test_FilterHandler_Handle_ShortenNegativeLimit(t *testing.T) {
 	down := newRecHandler(LevelTrace)
 	fl := NewFilterHandler(down, Shorten("body").Limit(-5))
 
@@ -310,10 +310,10 @@ func Test_FilteredLogger_Handle_ShortenNegativeLimit(t *testing.T) {
 	}
 }
 
-// Test_FilteredLogger_ConcurrentWithAndAddFilter exercises the lock around the
+// Test_FilterHandler_ConcurrentWithAndAddFilter exercises the lock around the
 // filter slice: WithAttrs/WithGroup read it while AddFilter mutates it. Run with
 // -race to catch an unguarded read.
-func Test_FilteredLogger_ConcurrentWithAndAddFilter(t *testing.T) {
+func Test_FilterHandler_ConcurrentWithAndAddFilter(t *testing.T) {
 	fl := NewFilterHandler(noopHandler{})
 
 	var wg sync.WaitGroup
@@ -336,7 +336,7 @@ func Test_FilteredLogger_ConcurrentWithAndAddFilter(t *testing.T) {
 	wg.Wait()
 }
 
-func Test_FilteredLogger_AddAndSetFilters(t *testing.T) {
+func Test_FilterHandler_AddAndSetFilters(t *testing.T) {
 	down := newRecHandler(LevelTrace)
 	fl := NewFilterHandler(down)
 

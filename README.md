@@ -18,6 +18,8 @@ other handler you already use. It has **zero dependencies**. It adds:
 - **Fan-out** - send one record to several outputs at once (console + file + ...).
 - **Custom levels** - `TRACE` below `DEBUG` and `FATAL` above `ERROR`, rendered
   with their names instead of slog's numeric fallback.
+- **`log.Discard()`** - a silent `log.Logger` for tests and libraries that should
+  produce no output.
 
 ```sh
 go get github.com/toaweme/log
@@ -63,7 +65,7 @@ it drops into anything that expects one.
 | `log.WithJSON(w)` | a JSON handler writing to `w` |
 | `log.WithOutput(h)` | any `slog.Handler` you already have (memory sink, exporter, ...) |
 | `log.WithLevel(l)` | minimum level for the `Text`/`JSON` outputs (default `DEBUG`) |
-| `log.WithFilters(f...)` | wraps every output in a `FilteredLogger` |
+| `log.WithFilters(f...)` | wraps every output in a `FilterHandler` |
 
 Pass as many outputs as you like; they fan out automatically.
 
@@ -101,7 +103,7 @@ func setupLogging(path string) {
         log.WithText(os.Stdout),
         log.WithJSON(&lumberjack.Logger{Filename: path, MaxSize: 20, MaxBackups: 5, Compress: true}),
         log.WithFilters(
-            log.Deny().Attr("path", "/healthz*"),
+            log.Deny().Attr("component", "cache*"), // hush a chatty subsystem
         ),
     )
     log.SetDefault(logger)
@@ -124,7 +126,7 @@ logger := log.New(
 ).With("pid", os.Getpid())
 ```
 
-> Building a raw handler yourself? Pass `log.Options(level)` as its
+> Building a raw handler yourself? Pass `log.HandlerOptions(level)` as its
 > `*slog.HandlerOptions` so it renders the custom `TRACE`/`FATAL` level names
 > the same way `Text`/`JSON` do.
 
@@ -150,9 +152,26 @@ func (s *Server) handle() {
 Pass `log.New(...)` in production and `log.Default()` (or a buffer-backed
 `log.New(log.WithText(&buf))`) in tests.
 
+### A silent logger: `log.Discard()`
+
+When a test or a library just needs a `log.Logger` that produces no output, use
+`log.Discard()`. It drops every record.
+
+```go
+srv := NewServer(log.Discard()) // logs nothing
+
+func TestThing(t *testing.T) {
+    thing := New(log.Discard()) // keep test output clean
+    // ...
+}
+```
+
+It is the idiomatic null logger for this package, the equivalent of wiring up
+`slog.New(slog.DiscardHandler)` yourself.
+
 ## Filtering
 
-`log.WithFilters` wraps your outputs in a `FilteredLogger` that runs an ordered
+`log.WithFilters` wraps your outputs in a `FilterHandler` that runs an ordered
 list of filters over each record. Filters are built fluently:
 
 ```go
@@ -161,10 +180,10 @@ log.New(
     log.WithFilters(
         // drop everything below Info (a level floor)
         log.Deny().Below(slog.LevelInfo),
-        // drop health-check noise; * is a prefix match
-        log.Deny().Attr("path", "/healthz*"),
-        // truncate fat response bodies to 200 chars
-        log.Shorten("body").Limit(200).Message("http response"),
+        // drop a chatty subsystem; * is a prefix match
+        log.Deny().Attr("component", "cache-*"),
+        // truncate the fat "body" attr to 200 chars wherever it appears
+        log.Shorten("body").Limit(200),
     ),
 )
 ```
@@ -184,7 +203,7 @@ Match criteria (chain as many as you need; **all** must match):
 - `.Below(level)` - matches records *strictly below* `level`. Paired with `Deny`
   it acts as a floor.
 
-Filters can be changed at runtime on a `*FilteredLogger` via `AddFilter` and
+Filters can be changed at runtime on a `*FilterHandler` via `AddFilter` and
 `SetFilters`; both are safe to call while logging.
 
 ## Fan-out and custom levels directly
@@ -194,12 +213,12 @@ The primitives `log.New` builds on are exported for hand-assembly:
 ```go
 // fan one record out to several handlers
 multi := log.NewMultiHandler(
-    slog.NewTextHandler(os.Stdout, log.Options(slog.LevelDebug)),
-    slog.NewJSONHandler(file, log.Options(slog.LevelDebug)),
+    slog.NewTextHandler(os.Stdout, log.HandlerOptions(slog.LevelDebug)),
+    slog.NewJSONHandler(file, log.HandlerOptions(slog.LevelDebug)),
 )
 
 // wrap any handler in filters
-filtered := log.NewFilteredLogger(multi, log.Deny().Below(slog.LevelInfo))
+filtered := log.NewFilterHandler(multi, log.Deny().Below(slog.LevelInfo))
 
 logger := log.Wrap(slog.New(filtered)) // adopt an existing *slog.Logger
 ```
@@ -219,12 +238,9 @@ quiet := logger.WithLevel(slog.LevelError) // same outputs, higher threshold
 
 ## Opinions
 
-This package makes choices the standard library leaves open. They suit its
-intended use (desktop apps and servers you own end to end).
-
 - **`Fatal` does not exit.** It logs a `FATAL` record and returns. `slog` itself
   ships no `Fatal`, and `os.Exit` inside a logging call skips deferred cleanup
-  and unflushed writers, including the FATAL record itself. If you want to die,
+  and unflushed writers, including the FATAL record itself. If you want to exit,
   call `os.Exit(1)` yourself, after the record is flushed or shipped.
 - **`Filter.Below` is a floor, not a ceiling.** It matches records *below* the
   given level. See [Filtering](#filtering).
