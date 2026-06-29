@@ -1,6 +1,13 @@
 # log
 
-[![Quality](https://github.com/toaweme/log/actions/workflows/tests.yml/badge.svg)](https://github.com/toaweme/log/actions/workflows/tests.yml)
+[![Quality](https://github.com/toaweme/log/actions/workflows/quality.yml/badge.svg)](https://github.com/toaweme/log/actions/workflows/quality.yml)
+<a href="https://code.toawe.me/toaweme/log/health">
+    <picture>
+        <source media="(prefers-color-scheme: dark)" srcset="https://code.toawe.me/toaweme/log/badge-dark.svg">
+        <source media="(prefers-color-scheme: light)" srcset="https://code.toawe.me/toaweme/log/badge.svg">
+        <img alt="log health" src="https://code.toawe.me/toaweme/log/badge.svg">
+    </picture>
+</a>
 [![Go Reference](https://img.shields.io/badge/Docs-pkg.go.dev-blue)](https://pkg.go.dev/github.com/toaweme/log)
 [![GitHub Tag](https://img.shields.io/github/v/tag/toaweme/log?label=Tag&color=green)](https://github.com/toaweme/log/releases)
 [![License](https://img.shields.io/badge/License-MIT-blue)](/LICENSE)
@@ -248,3 +255,17 @@ quiet := logger.WithLevel(slog.LevelError) // same outputs, higher threshold
   there for convenience; prefer injecting `log.Logger` in code you care about and
   treat the global as a quick-start. `log.SetLevel` only moves the built-in
   default; once you `SetDefault` your own logger, set its level when you build it.
+
+## Hosted code and health reports
+
+Reports for this repo are hosted by our <a href="https://code.toawe.me">code viewer</a>, which also serves the badges and cards above.
+
+<p align="center">
+  <a href="https://code.toawe.me/toaweme/log/health"><picture><source media="(prefers-color-scheme: dark)" srcset="https://code.toawe.me/toaweme/log/card.svg"><source media="(prefers-color-scheme: light)" srcset="https://code.toawe.me/toaweme/log/card-light.svg"><img alt="log health" src="https://code.toawe.me/toaweme/log/card-light.svg" width="48%"></picture></a>
+  <a href="https://code.toawe.me/toaweme/log/code"><picture><source media="(prefers-color-scheme: dark)" srcset="https://code.toawe.me/toaweme/log/code-card.svg"><source media="(prefers-color-scheme: light)" srcset="https://code.toawe.me/toaweme/log/code-card-light.svg"><img alt="log code" src="https://code.toawe.me/toaweme/log/code-card-light.svg" width="48%"></picture></a>
+</p>
+
+---
+
+Made with ❤️ in Lithuania 🇱🇹.
+
