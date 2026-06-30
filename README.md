@@ -261,8 +261,8 @@ quiet := logger.WithLevel(slog.LevelError) // same outputs, higher threshold
 Reports for this repo are hosted by our <a href="https://code.toawe.me">code viewer</a>, which also serves the badges and cards above.
 
 <p align="center">
-  <a href="https://code.toawe.me/toaweme/log/health"><picture><source media="(prefers-color-scheme: dark)" srcset="https://code.toawe.me/toaweme/log/card.svg"><source media="(prefers-color-scheme: light)" srcset="https://code.toawe.me/toaweme/log/card-light.svg"><img alt="log health" src="https://code.toawe.me/toaweme/log/card-light.svg" width="48%"></picture></a>
-  <a href="https://code.toawe.me/toaweme/log/code"><picture><source media="(prefers-color-scheme: dark)" srcset="https://code.toawe.me/toaweme/log/code-card.svg"><source media="(prefers-color-scheme: light)" srcset="https://code.toawe.me/toaweme/log/code-card-light.svg"><img alt="log code" src="https://code.toawe.me/toaweme/log/code-card-light.svg" width="48%"></picture></a>
+  <a href="https://code.toawe.me/toaweme/log/health"><picture><source media="(prefers-color-scheme: dark)" srcset="https://code.toawe.me/toaweme/log/card-dark.svg"><source media="(prefers-color-scheme: light)" srcset="https://code.toawe.me/toaweme/log/card.svg"><img alt="log health" src="https://code.toawe.me/toaweme/log/card.svg" width="48%"></picture></a>
+  <a href="https://code.toawe.me/toaweme/log/code"><picture><source media="(prefers-color-scheme: dark)" srcset="https://code.toawe.me/toaweme/log/code-card-dark.svg"><source media="(prefers-color-scheme: light)" srcset="https://code.toawe.me/toaweme/log/code-card.svg"><img alt="log code" src="https://code.toawe.me/toaweme/log/code-card.svg" width="48%"></picture></a>
 </p>
 
 ---
