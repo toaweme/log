@@ -10,7 +10,7 @@
 </a>
 [![Go Reference](https://img.shields.io/badge/Docs-pkg.go.dev-blue)](https://pkg.go.dev/github.com/toaweme/log)
 [![GitHub Tag](https://img.shields.io/github/v/tag/toaweme/log?label=Tag&color=green)](https://github.com/toaweme/log/releases)
-[![License](https://img.shields.io/badge/License-MIT-blue)](/LICENSE)
+[![License](https://img.shields.io/badge/License-Apache_2.0-blue)](/LICENSE)
 
 ## Simple slog wrapper
 
