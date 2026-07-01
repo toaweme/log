@@ -5,6 +5,18 @@ All notable changes to this project are documented here, newest first.
 Entries are generated from [Conventional Commits](https://www.conventionalcommits.org)
 and grouped by change type. This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.2.1] - 2026-07-01
+
+### CI & Build
+
+- Bump care to v0.8.0 by [@iberflow](https://github.com/iberflow) in [85429c8](https://github.com/toaweme/log/commit/85429c86f7660d558568b8cd0815551744e5938c).
+- Bump care to v0.7.1 and pin to commit sha by [@iberflow](https://github.com/iberflow) in [cca3fe8](https://github.com/toaweme/log/commit/cca3fe8f17bdeb2e18172167c1080250735d6c35).
+- Bump care to v0.6.0 and fix card-svg dark/light wiring by [@iberflow](https://github.com/iberflow) in [c5b8d4c](https://github.com/toaweme/log/commit/c5b8d4cfce337c80e577f2d5d6b7cb8364b2c7d8).
+
+### Chores & Other
+
+- Align README, CHANGELOG, and quality workflow with org standards by [@iberflow](https://github.com/iberflow) in [47b55fe](https://github.com/toaweme/log/commit/47b55fee7096107611ee7d7e0a9fd1b25cabd165).
+
 ## [0.2.0] - 2026-06-15
 
 ### Fixes
@@ -48,5 +60,6 @@ and grouped by change type. This project adheres to [Semantic Versioning](https:
 - Remove header names by [@iberflow](https://github.com/iberflow) in [8a64ef1](https://github.com/toaweme/log/commit/8a64ef109ff2b1372970cf7dace1340246d1ded6).
 - Cleanup module by [@iberflow](https://github.com/iberflow) in [42ce4ab](https://github.com/toaweme/log/commit/42ce4ab975ff8a31b0256fd3146f3eaf74229e90).
 
+[0.2.1]: https://github.com/toaweme/log/compare/v0.2.0...v0.2.1
 [0.2.0]: https://github.com/toaweme/log/compare/v0.1.0...v0.2.0
 [0.1.0]: https://github.com/toaweme/log/releases/tag/v0.1.0
