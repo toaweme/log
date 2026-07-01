@@ -5,6 +5,13 @@ All notable changes to this project are documented here, newest first.
 Entries are generated from [Conventional Commits](https://www.conventionalcommits.org)
 and grouped by change type. This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### CI & Build
+
+- Bump care to v0.8.1 by [@iberflow](https://github.com/iberflow) in [8f0e217](https://github.com/toaweme/log/commit/8f0e217f0999e5bcfe5db54bf9e1ea99e60e3aad).
+- Use stable go for release gate to avoid old-go.mod tool-install failures by [@iberflow](https://github.com/iberflow) in [3de98ed](https://github.com/toaweme/log/commit/3de98edc5557dc9ffc11e4fef4f3013b77ca1f23).
+
 ## [0.2.1] - 2026-07-01
 
 ### CI & Build
@@ -60,6 +67,7 @@ and grouped by change type. This project adheres to [Semantic Versioning](https:
 - Remove header names by [@iberflow](https://github.com/iberflow) in [8a64ef1](https://github.com/toaweme/log/commit/8a64ef109ff2b1372970cf7dace1340246d1ded6).
 - Cleanup module by [@iberflow](https://github.com/iberflow) in [42ce4ab](https://github.com/toaweme/log/commit/42ce4ab975ff8a31b0256fd3146f3eaf74229e90).
 
+[Unreleased]: https://github.com/toaweme/log/compare/v0.2.1...HEAD
 [0.2.1]: https://github.com/toaweme/log/compare/v0.2.0...v0.2.1
 [0.2.0]: https://github.com/toaweme/log/compare/v0.1.0...v0.2.0
 [0.1.0]: https://github.com/toaweme/log/releases/tag/v0.1.0
