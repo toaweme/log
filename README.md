@@ -28,6 +28,8 @@ other handler you already use. It has **zero dependencies**. It adds:
 - **`log.Discard()`** - a silent `log.Logger` for tests and libraries that should
   produce no output.
 
+**[Documentation](https://toawe.me/docs/log)** | [toawe.me](https://toawe.me)
+
 ```sh
 go get github.com/toaweme/log
 ```
