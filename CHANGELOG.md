@@ -5,12 +5,35 @@ All notable changes to this project are documented here, newest first.
 Entries are generated from [Conventional Commits](https://www.conventionalcommits.org)
 and grouped by change type. This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased]
+## [0.3.0] - 2026-09-05
+
+### Fixes
+
+- Pin care action by commit sha, not tag object by [@iberflow](https://github.com/iberflow) in [da2f42a](https://github.com/toaweme/log/commit/da2f42a3fddd8e92fa747203439d971d68e7e2fc).
+
+### Documentation
+
+- Link to docs site from README by [@iberflow](https://github.com/iberflow) in [8a703d7](https://github.com/toaweme/log/commit/8a703d74cf0403b188c5615dabfedb7a3020e4ca).
+- Add Contributing section to README by [@iberflow](https://github.com/iberflow) in [3e8cebf](https://github.com/toaweme/log/commit/3e8cebf837007a1467ee71b011cd776e10857520).
+
+### Refactors
+
+- Collapse the level onto one process-wide source and drop the filter handler by [@iberflow](https://github.com/iberflow) in [#6](https://github.com/toaweme/log/pull/6).
 
 ### CI & Build
 
-- Bump care to v0.8.1 by [@iberflow](https://github.com/iberflow) in [8f0e217](https://github.com/toaweme/log/commit/8f0e217f0999e5bcfe5db54bf9e1ea99e60e3aad).
-- Use stable go for release gate to avoid old-go.mod tool-install failures by [@iberflow](https://github.com/iberflow) in [3de98ed](https://github.com/toaweme/log/commit/3de98edc5557dc9ffc11e4fef4f3013b77ca1f23).
+- Pin release build to go 1.26 instead of stable by [@iberflow](https://github.com/iberflow) in [5f629e2](https://github.com/toaweme/log/commit/5f629e2e2cb327c23fd0f8e5178a166fc238c351).
+- Pin quality gate to go 1.26 instead of stable by [@iberflow](https://github.com/iberflow) in [e75f6a1](https://github.com/toaweme/log/commit/e75f6a15d91fdc541cba52559439d87b69f39794).
+- Publish code.json via codereport action by [@iberflow](https://github.com/iberflow) in [#2](https://github.com/toaweme/log/pull/2).
+- Bump care action to v0.9.3 by [@iberflow](https://github.com/iberflow) in [712d2a4](https://github.com/toaweme/log/commit/712d2a4f72f5f2ac302c048925bb164ad02b3eaa).
+- Move action version to inline comment so dependabot maintains it by [@iberflow](https://github.com/iberflow) in [d202e69](https://github.com/toaweme/log/commit/d202e69b32cb30c3cfbd390419141a0529850ba7).
+- Drop gomod dependabot block from dependency-free module by [@iberflow](https://github.com/iberflow) in [a94f0b1](https://github.com/toaweme/log/commit/a94f0b12968cd46b0a65236695afde4e2fdb145a).
+- Add governance workflows and contributor docs by [@iberflow](https://github.com/iberflow) in [cd5b9bf](https://github.com/toaweme/log/commit/cd5b9bf7327a8ce73d3060225a8cadf35fa098d3).
+
+### Chores & Other
+
+- Linter fix by [@iberflow](https://github.com/iberflow) in [246d275](https://github.com/toaweme/log/commit/246d275bfe5b6afd6dbb8f734654ac1a18b1ce30).
+- Relicense from MIT to Apache 2.0 by [@iberflow](https://github.com/iberflow) in [d3624a2](https://github.com/toaweme/log/commit/d3624a2680a54bd446f24ca781155491bf797f88).
 
 ## [0.2.1] - 2026-07-01
 
@@ -67,7 +90,7 @@ and grouped by change type. This project adheres to [Semantic Versioning](https:
 - Remove header names by [@iberflow](https://github.com/iberflow) in [8a64ef1](https://github.com/toaweme/log/commit/8a64ef109ff2b1372970cf7dace1340246d1ded6).
 - Cleanup module by [@iberflow](https://github.com/iberflow) in [42ce4ab](https://github.com/toaweme/log/commit/42ce4ab975ff8a31b0256fd3146f3eaf74229e90).
 
-[Unreleased]: https://github.com/toaweme/log/compare/v0.2.1...HEAD
+[0.3.0]: https://github.com/toaweme/log/compare/v0.2.1...v0.3.0
 [0.2.1]: https://github.com/toaweme/log/compare/v0.2.0...v0.2.1
 [0.2.0]: https://github.com/toaweme/log/compare/v0.1.0...v0.2.0
 [0.1.0]: https://github.com/toaweme/log/releases/tag/v0.1.0
