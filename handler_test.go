@@ -2,55 +2,11 @@ package log
 
 import (
 	"bytes"
-	"context"
 	"encoding/json"
 	"log/slog"
 	"strings"
 	"testing"
 )
-
-func Test_Logger_WithLevel_PreservesWriterAndFormat(t *testing.T) {
-	var buf bytes.Buffer
-	base := slog.New(slog.NewJSONHandler(&buf, HandlerOptions(LevelTrace)))
-	logger := Wrap(base)
-
-	// raise the threshold to Error; the writer and JSON format must be kept.
-	leveled := logger.WithLevel(slog.LevelError)
-
-	leveled.Info("suppressed")
-	leveled.Error("kept")
-
-	out := buf.String()
-	if strings.Contains(out, "suppressed") {
-		t.Fatalf("info record was emitted despite Error threshold: %q", out)
-	}
-	if !strings.Contains(out, "kept") {
-		t.Fatalf("error record missing; writer was not preserved: %q", out)
-	}
-
-	// the format must still be JSON (proving the handler was not rebuilt as text).
-	var rec map[string]any
-	if err := json.Unmarshal([]byte(strings.TrimSpace(out)), &rec); err != nil {
-		t.Fatalf("output is not JSON, format was lost: %q (%v)", out, err)
-	}
-	if rec["msg"] != "kept" {
-		t.Fatalf("msg = %v, want %q", rec["msg"], "kept")
-	}
-}
-
-func Test_Logger_WithLevel_CanWidenAgain(t *testing.T) {
-	var buf bytes.Buffer
-	base := slog.New(slog.NewTextHandler(&buf, HandlerOptions(LevelTrace)))
-	logger := Wrap(base)
-
-	narrowed := logger.WithLevel(slog.LevelError)
-	widened := narrowed.WithLevel(LevelTrace)
-
-	widened.Info("now visible")
-	if !strings.Contains(buf.String(), "now visible") {
-		t.Fatalf("re-widening did not re-enable Info: %q", buf.String())
-	}
-}
 
 func Test_Logger_With_AddsAttributes(t *testing.T) {
 	var buf bytes.Buffer
@@ -68,6 +24,46 @@ func Test_Logger_With_AddsAttributes(t *testing.T) {
 	}
 }
 
+func Test_Logger_WithGroup_NestsAttributes(t *testing.T) {
+	var buf bytes.Buffer
+	base := slog.New(slog.NewJSONHandler(&buf, HandlerOptions(LevelTrace)))
+	logger := Wrap(base).WithGroup("req").With("id", "42")
+
+	logger.Info("hello")
+
+	var rec map[string]any
+	if err := json.Unmarshal([]byte(strings.TrimSpace(buf.String())), &rec); err != nil {
+		t.Fatalf("unmarshal: %v", err)
+	}
+	group, ok := rec["req"].(map[string]any)
+	if !ok {
+		t.Fatalf("req group missing: %v", rec)
+	}
+	if group["id"] != "42" {
+		t.Fatalf("req.id = %v, want %q", group["id"], "42")
+	}
+}
+
+func Test_Logger_Enabled_FollowsTheHandler(t *testing.T) {
+	logger := Wrap(slog.New(newRecHandler(slog.LevelWarn)))
+
+	tests := []struct {
+		level slog.Level
+		want  bool
+	}{
+		{LevelTrace, false},
+		{slog.LevelDebug, false},
+		{slog.LevelInfo, false},
+		{slog.LevelWarn, true},
+		{slog.LevelError, true},
+	}
+	for _, tt := range tests {
+		if got := logger.Enabled(tt.level); got != tt.want {
+			t.Fatalf("Enabled(%v) = %v, want %v", tt.level, got, tt.want)
+		}
+	}
+}
+
 func Test_Logger_CustomLevels(t *testing.T) {
 	tests := []struct {
 		name      string
@@ -75,7 +71,6 @@ func Test_Logger_CustomLevels(t *testing.T) {
 		wantLevel string
 	}{
 		{"trace", func(l Logger) { l.Trace("t") }, "TRACE"},
-		{"fatal", func(l Logger) { l.Fatal("f") }, "FATAL"},
 		{"info", func(l Logger) { l.Info("i") }, "INFO"},
 	}
 	for _, tt := range tests {
@@ -97,26 +92,6 @@ func Test_Logger_CustomLevels(t *testing.T) {
 	}
 }
 
-func Test_levelHandler_Enabled(t *testing.T) {
-	down := newRecHandler(LevelTrace)
-	lh := &levelHandler{level: slog.LevelWarn, Handler: down}
-
-	tests := []struct {
-		level slog.Level
-		want  bool
-	}{
-		{slog.LevelDebug, false},
-		{slog.LevelInfo, false},
-		{slog.LevelWarn, true},
-		{slog.LevelError, true},
-	}
-	for _, tt := range tests {
-		if got := lh.Enabled(context.Background(), tt.level); got != tt.want {
-			t.Fatalf("Enabled(%v) = %v, want %v", tt.level, got, tt.want)
-		}
-	}
-}
-
 func Test_Logger_Slog_RoundTrips(t *testing.T) {
 	base := slog.New(slog.NewJSONHandler(&bytes.Buffer{}, nil))
 	logger := Wrap(base)
@@ -128,10 +103,16 @@ func Test_Logger_Slog_RoundTrips(t *testing.T) {
 func Test_Discard_DropsEverythingAndDisablesAllLevels(t *testing.T) {
 	l := Discard()
 
-	levels := []slog.Level{LevelTrace, slog.LevelDebug, slog.LevelInfo, slog.LevelWarn, slog.LevelError, LevelFatal}
+	levels := []slog.Level{LevelTrace, slog.LevelDebug, slog.LevelInfo, slog.LevelWarn, slog.LevelError}
 	for _, lv := range levels {
-		if l.Enabled(context.Background(), lv) {
+		if l.Enabled(lv) {
 			t.Fatalf("Enabled(%v) = true, want false", lv)
+		}
+		if l.With("k", "v").Enabled(lv) {
+			t.Fatalf("With().Enabled(%v) = true, want false", lv)
+		}
+		if l.WithGroup("g").Enabled(lv) {
+			t.Fatalf("WithGroup().Enabled(%v) = true, want false", lv)
 		}
 	}
 
@@ -140,5 +121,4 @@ func Test_Discard_DropsEverythingAndDisablesAllLevels(t *testing.T) {
 	l.Error("e")
 	l.With("k", "v").Warn("w")
 	l.Trace("t")
-	l.Fatal("f")
 }

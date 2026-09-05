@@ -15,16 +15,14 @@
 ## Simple slog wrapper
 
 `github.com/toaweme/log` is a thin layer over the standard library's `log/slog`.
-Everything is an ordinary `slog.Handler`, so it composes with the stdlib and any
-other handler you already use. It has **zero dependencies**. It adds:
+Outputs are ordinary `slog.Handler`s, so it composes with the stdlib and any
+handler you already use. It has **zero dependencies**. It adds:
 
-- `log.New(...)` assembles outputs, a level, and filters
-  without hand-wiring handlers.
-- **Filtering** - drop noisy records or shorten fat attribute values, by level,
-  message, or attribute match (with `*` prefix wildcards).
+- `log.New(...)` assembles outputs without hand-wiring handlers.
 - **Fan-out** - send one record to several outputs at once (console + file + ...).
-- **Custom levels** - `TRACE` below `DEBUG` and `FATAL` above `ERROR`, rendered
-  with their names instead of slog's numeric fallback.
+- **One process-wide level** - `SetLevel`, `Level` and `New` share it.
+- **`log.ParseLevel(s)`** - `LOG_LEVEL` string to `slog.Level`.
+- **A `TRACE` level** below `DEBUG`, rendered by name.
 - **`log.Discard()`** - a silent `log.Logger` for tests and libraries that should
   produce no output.
 
@@ -47,6 +45,16 @@ log.Trace("entered", "i", i)
 log.SetLevel(slog.LevelInfo) // raise the threshold
 ```
 
+Read the threshold at boot:
+
+```go
+lvl, err := log.ParseLevel(os.Getenv("LOG_LEVEL"))
+if err != nil {
+    lvl = slog.LevelInfo
+}
+log.SetLevel(lvl)
+```
+
 When you're ready to inject a logger instead of reaching for the global, build
 one with `log.New`.
 
@@ -65,16 +73,15 @@ logger.Info("ready")
 logger = logger.With("svc", "api") // every record now carries svc=api
 ```
 
-`log.Logger` is the interface you pass around. It is itself a `slog.Handler`, so
-it drops into anything that expects one.
+`log.Logger` is the interface you pass around. `logger.Slog()` returns the
+underlying `*slog.Logger`.
 
 | Option | What it adds |
 | --- | --- |
 | `log.WithText(w)` | a text handler writing to `w` |
 | `log.WithJSON(w)` | a JSON handler writing to `w` |
 | `log.WithOutput(h)` | any `slog.Handler` you already have (memory sink, exporter, ...) |
-| `log.WithLevel(l)` | minimum level for the `Text`/`JSON` outputs (default `DEBUG`) |
-| `log.WithFilters(f...)` | wraps every output in a `FilterHandler` |
+| `log.WithLevel(l)` | sets the process-wide minimum level (default `DEBUG`) |
 
 Pass as many outputs as you like; they fan out automatically.
 
@@ -111,15 +118,13 @@ func setupLogging(path string) {
     logger := log.New(
         log.WithText(os.Stdout),
         log.WithJSON(&lumberjack.Logger{Filename: path, MaxSize: 20, MaxBackups: 5, Compress: true}),
-        log.WithFilters(
-            log.Deny().Attr("component", "cache*"), // hush a chatty subsystem
-        ),
     )
     log.SetDefault(logger)
 }
 ```
 
-After `SetDefault`, `log.Info(...)` writes to both outputs and obeys the filters.
+After `SetDefault`, `log.Info(...)` writes to both outputs, and `log.SetLevel`
+still moves the threshold they share.
 
 ### Console + an in-memory sink (e.g. a live log view)
 
@@ -135,9 +140,9 @@ logger := log.New(
 ).With("pid", os.Getpid())
 ```
 
-> Building a raw handler yourself? Pass `log.HandlerOptions(level)` as its
-> `*slog.HandlerOptions` so it renders the custom `TRACE`/`FATAL` level names
-> the same way `Text`/`JSON` do.
+> Building a raw handler yourself? Pass `log.HandlerOptions(log.Level())` as its
+> `*slog.HandlerOptions` so it renders the custom `TRACE` level name the same way
+> `Text`/`JSON` do.
 
 ### Inject the logger into your types
 
@@ -178,43 +183,6 @@ func TestThing(t *testing.T) {
 It is the idiomatic null logger for this package, the equivalent of wiring up
 `slog.New(slog.DiscardHandler)` yourself.
 
-## Filtering
-
-`log.WithFilters` wraps your outputs in a `FilterHandler` that runs an ordered
-list of filters over each record. Filters are built fluently:
-
-```go
-log.New(
-    log.WithText(os.Stdout),
-    log.WithFilters(
-        // drop everything below Info (a level floor)
-        log.Deny().Below(slog.LevelInfo),
-        // drop a chatty subsystem; * is a prefix match
-        log.Deny().Attr("component", "cache-*"),
-        // truncate the fat "body" attr to 200 chars wherever it appears
-        log.Shorten("body").Limit(200),
-    ),
-)
-```
-
-Builders:
-
-- `log.Deny()` drops matching records.
-- `log.Allow()` passes matching records through unchanged.
-- `log.Shorten(keys...)` truncates the given attribute values (default limit 100,
-  change with `.Limit(n)`).
-
-Match criteria (chain as many as you need; **all** must match):
-
-- `.Message("...")` - exact message match.
-- `.Attr(key, val)` - attribute equals `val`; a `val` ending in `*` is a prefix
-  match. The record's message is available under the synthetic `"msg"` key.
-- `.Below(level)` - matches records *strictly below* `level`. Paired with `Deny`
-  it acts as a floor.
-
-Filters can be changed at runtime on a `*FilterHandler` via `AddFilter` and
-`SetFilters`; both are safe to call while logging.
-
 ## Fan-out and custom levels directly
 
 The primitives `log.New` builds on are exported for hand-assembly:
@@ -222,14 +190,11 @@ The primitives `log.New` builds on are exported for hand-assembly:
 ```go
 // fan one record out to several handlers
 multi := log.NewMultiHandler(
-    slog.NewTextHandler(os.Stdout, log.HandlerOptions(slog.LevelDebug)),
-    slog.NewJSONHandler(file, log.HandlerOptions(slog.LevelDebug)),
+    slog.NewTextHandler(os.Stdout, log.HandlerOptions(log.Level())),
+    slog.NewJSONHandler(file, log.HandlerOptions(log.Level())),
 )
 
-// wrap any handler in filters
-filtered := log.NewFilterHandler(multi, log.Deny().Below(slog.LevelInfo))
-
-logger := log.Wrap(slog.New(filtered)) // adopt an existing *slog.Logger
+logger := log.Wrap(slog.New(multi)) // adopt an existing *slog.Logger
 ```
 
 A `MultiHandler` drops a record only when *every* child would discard it, and one
@@ -237,26 +202,22 @@ failing output does not stop the others (errors are joined). `log.Wrap` adopts
 any `*slog.Logger` as a `log.Logger`; `logger.Slog()` gets the `*slog.Logger`
 back.
 
-The custom levels are `log.LevelTrace` (below `DEBUG`) and `log.LevelFatal`
-(above `ERROR`). Every `log.Logger` has `Trace`/`Fatal` helpers, and
-`WithLevel` returns a logger at a new threshold while keeping the same outputs:
-
-```go
-quiet := logger.WithLevel(slog.LevelError) // same outputs, higher threshold
-```
+The custom level is `log.LevelTrace`, below `DEBUG`. Every `log.Logger` has a
+`Trace` helper alongside the usual four.
 
 ## Opinions
 
-- **`Fatal` does not exit.** It logs a `FATAL` record and returns. `slog` itself
-  ships no `Fatal`, and `os.Exit` inside a logging call skips deferred cleanup
-  and unflushed writers, including the FATAL record itself. If you want to exit,
-  call `os.Exit(1)` yourself, after the record is flushed or shipped.
-- **`Filter.Below` is a floor, not a ceiling.** It matches records *below* the
-  given level. See [Filtering](#filtering).
-- **There is a global logger.** Created in `init`, writing text to stdout. It is
-  there for convenience; prefer injecting `log.Logger` in code you care about and
-  treat the global as a quick-start. `log.SetLevel` only moves the built-in
-  default; once you `SetDefault` your own logger, set its level when you build it.
+- **There is one level for the whole process.** `log.SetLevel`, `log.Level` and
+  `log.WithLevel` all move and read the same value, and every logger `log.New`
+  builds reads it too, so `log.Level()` never reports a threshold that is not in
+  effect. Set it once at boot from `LOG_LEVEL`. The exception is a handler you
+  hand to `log.WithOutput`, which keeps whatever level it was built with.
+- **There is a global logger.** Built on the first call to `log.Default()`,
+  writing text to stdout, so importing the package opens nothing. It is there for
+  convenience; prefer injecting `log.Logger` in code you care about.
+- **There is no `Fatal`.** A logging call that exits skips deferred cleanup and
+  unflushed writers, and one that does not exit is a trap for anyone reading the
+  name. Log at `Error` and call `os.Exit(1)` yourself.
 
 ## Contributing
 

@@ -3,6 +3,7 @@ package log
 import (
 	"bytes"
 	"encoding/json"
+	"errors"
 	"log/slog"
 	"strings"
 	"testing"
@@ -17,6 +18,14 @@ func withGlobalLogger(t *testing.T, h slog.Handler) {
 	t.Cleanup(func() { SetDefault(prev) })
 }
 
+// withLevel restores the process-wide level after a test moves it.
+func withLevel(t *testing.T, l slog.Level) {
+	t.Helper()
+	prev := Level()
+	t.Cleanup(func() { SetLevel(prev) })
+	SetLevel(l)
+}
+
 func Test_PackageHelpers_RouteToDefaultLogger(t *testing.T) {
 	tests := []struct {
 		name      string
@@ -29,7 +38,6 @@ func Test_PackageHelpers_RouteToDefaultLogger(t *testing.T) {
 		{"debug", func() { Debug("d") }, "d", "DEBUG"},
 		{"warn", func() { Warn("w") }, "w", "WARN"},
 		{"trace", func() { Trace("t") }, "t", "TRACE"},
-		{"fatal", func() { Fatal("f") }, "f", "FATAL"},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -52,18 +60,13 @@ func Test_PackageHelpers_RouteToDefaultLogger(t *testing.T) {
 	}
 }
 
-func Test_SetLevel_GatesPackageHelpers(t *testing.T) {
+func Test_SetLevel_GatesLoggersBuiltByNew(t *testing.T) {
 	var buf bytes.Buffer
-	// the default logger built in init is wired to globalLevel, so a handler
-	// wired to the same var reproduces that behavior under SetLevel.
-	withGlobalLogger(t, slog.NewTextHandler(&buf, HandlerOptions(globalLevel)))
+	logger := New(WithText(&buf))
+	withLevel(t, slog.LevelError)
 
-	prev := Level()
-	t.Cleanup(func() { SetLevel(prev) })
-
-	SetLevel(slog.LevelError)
-	Info("hidden")
-	Error("shown")
+	logger.Info("hidden")
+	logger.Error("shown")
 
 	out := buf.String()
 	if strings.Contains(out, "hidden") {
@@ -74,13 +77,80 @@ func Test_SetLevel_GatesPackageHelpers(t *testing.T) {
 	}
 }
 
+func Test_Level_AgreesWithNewWithLevelAndSetDefault(t *testing.T) {
+	prev := Level()
+	prevDefault := Default()
+	t.Cleanup(func() {
+		SetLevel(prev)
+		SetDefault(prevDefault)
+	})
+
+	var buf bytes.Buffer
+	SetDefault(New(WithText(&buf), WithLevel(slog.LevelWarn)))
+
+	if got := Level(); got != slog.LevelWarn {
+		t.Fatalf("Level() = %v, want %v", got, slog.LevelWarn)
+	}
+
+	Info("hidden")
+	if buf.Len() != 0 {
+		t.Fatalf("info leaked past the Warn threshold: %q", buf.String())
+	}
+
+	// SetLevel must still reach the logger New built.
+	SetLevel(LevelTrace)
+	if got := Level(); got != LevelTrace {
+		t.Fatalf("Level() = %v, want %v", got, LevelTrace)
+	}
+	Trace("visible")
+	if !strings.Contains(buf.String(), "visible") {
+		t.Fatalf("SetLevel did not reach the installed logger: %q", buf.String())
+	}
+}
+
+func Test_ParseLevel(t *testing.T) {
+	tests := []struct {
+		in      string
+		want    slog.Level
+		wantErr bool
+	}{
+		{in: "trace", want: LevelTrace},
+		{in: "TRACE", want: LevelTrace},
+		{in: "Debug", want: slog.LevelDebug},
+		{in: "info", want: slog.LevelInfo},
+		{in: " INFO ", want: slog.LevelInfo},
+		{in: "warn", want: slog.LevelWarn},
+		{in: "warning", want: slog.LevelWarn},
+		{in: "eRRoR", want: slog.LevelError},
+		{in: "", wantErr: true},
+		{in: "fatal", wantErr: true},
+		{in: "verbose", wantErr: true},
+	}
+	for _, tt := range tests {
+		t.Run(tt.in, func(t *testing.T) {
+			got, err := ParseLevel(tt.in)
+			if tt.wantErr {
+				if !errors.Is(err, ErrUnknownLevel) {
+					t.Fatalf("ParseLevel(%q) err = %v, want ErrUnknownLevel", tt.in, err)
+				}
+				return
+			}
+			if err != nil {
+				t.Fatalf("ParseLevel(%q) returned %v", tt.in, err)
+			}
+			if got != tt.want {
+				t.Fatalf("ParseLevel(%q) = %v, want %v", tt.in, got, tt.want)
+			}
+		})
+	}
+}
+
 func Test_renameLevels_RendersCustomLevelNames(t *testing.T) {
 	tests := []struct {
 		level slog.Level
 		want  string
 	}{
 		{LevelTrace, "TRACE"},
-		{LevelFatal, "FATAL"},
 		{slog.LevelInfo, "INFO"},
 		{slog.LevelError, "ERROR"},
 	}
@@ -103,26 +173,18 @@ func Test_renameLevels_LeavesNonLevelAttrsUntouched(t *testing.T) {
 	}
 }
 
-func Test_New_AssemblesOutputsAndFilters(t *testing.T) {
+func Test_New_FansOutToEveryOutput(t *testing.T) {
 	var text, jsonBuf bytes.Buffer
-	logger := New(
-		WithText(&text),
-		WithJSON(&jsonBuf),
-		WithLevel(slog.LevelInfo),
-		WithFilters(Deny().Message("drop me")),
-	)
+	withLevel(t, slog.LevelInfo)
+	logger := New(WithText(&text), WithJSON(&jsonBuf))
 
 	logger.Debug("below threshold")
-	logger.Info("drop me")
 	logger.Info("keep me", "k", "v")
 
 	for _, buf := range []*bytes.Buffer{&text, &jsonBuf} {
 		out := buf.String()
 		if strings.Contains(out, "below threshold") {
 			t.Fatalf("debug leaked past Info level: %q", out)
-		}
-		if strings.Contains(out, "drop me") {
-			t.Fatalf("denied record was emitted: %q", out)
 		}
 		if !strings.Contains(out, "keep me") {
 			t.Fatalf("kept record missing from output: %q", out)
