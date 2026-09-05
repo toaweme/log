@@ -50,12 +50,6 @@ func (h *recHandler) WithGroup(name string) slog.Handler {
 	return &cp
 }
 
-func (h *recHandler) seen() []slog.Record {
-	h.mu.Lock()
-	defer h.mu.Unlock()
-	return append([]slog.Record{}, *h.records...)
-}
-
 // fakeHandler records the messages it handled and can be told to fail or to
 // gate a minimum level, for MultiHandler tests.
 type fakeHandler struct {
@@ -106,16 +100,6 @@ func (noopHandler) Enabled(context.Context, slog.Level) bool  { return true }
 func (noopHandler) Handle(context.Context, slog.Record) error { return nil }
 func (h noopHandler) WithAttrs([]slog.Attr) slog.Handler      { return h }
 func (h noopHandler) WithGroup(string) slog.Handler           { return h }
-
-// attrsOf flattens a record's attributes into a key/value map for assertions.
-func attrsOf(r slog.Record) map[string]string {
-	out := make(map[string]string)
-	r.Attrs(func(a slog.Attr) bool {
-		out[a.Key] = a.Value.String()
-		return true
-	})
-	return out
-}
 
 // newRecord builds a record at level with msg and the given key/value attrs. It
 // uses a zero timestamp so records are deterministic.

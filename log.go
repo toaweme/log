@@ -1,51 +1,67 @@
 // Package log is a small, opinionated slog extension.
-// Composable handlers (filtering, fan-out, per-logger level), two custom levels (TRACE, FATAL).
-//
-// Note: Fatal logs a FATAL record and returns. It does NOT call os.Exit; the
-// decision to exit (and to flush or ship logs first) stays with the caller.
+// It adds a TRACE level below DEBUG, a fan-out handler, a silent logger, and one
+// process-wide level that every logger this package builds reads from.
 package log
 
 import (
+	"errors"
+	"fmt"
 	"io"
 	"log/slog"
 	"os"
+	"strings"
 	"sync"
 )
 
-// Logger is the extended slog contract: a slog.Handler plus level-aware helpers
-// and the custom Trace/Fatal levels.
+// Logger is the logging contract this package hands around.
+// It stays deliberately narrow so a test double is a handful of methods.
 type Logger interface {
-	slog.Handler
+	// With returns a logger that adds args to every subsequent record.
 	With(args ...any) Logger
-	// WithLevel returns a logger with a new minimum level, preserving the
-	// underlying outputs, format, and attributes.
-	WithLevel(level slog.Level) Logger
+	// WithGroup returns a logger that nests subsequent attributes under name.
+	WithGroup(name string) Logger
+	// Enabled reports whether a record at level would be emitted.
+	Enabled(level slog.Level) bool
 	Trace(msg string, args ...any)
 	Debug(msg string, args ...any)
 	Info(msg string, args ...any)
 	Warn(msg string, args ...any)
 	Error(msg string, args ...any)
-	// Fatal logs at LevelFatal and returns; it does not exit the process.
-	Fatal(msg string, args ...any)
 	// Slog returns the wrapped *slog.Logger as an escape hatch.
 	Slog() *slog.Logger
 }
 
-const (
-	// LevelTrace sits below slog.LevelDebug for the noisiest diagnostics.
-	LevelTrace = slog.Level(-8)
-	// LevelFatal sits above slog.LevelError. Logging at this level does not
-	// exit the process; it only emits a FATAL record.
-	LevelFatal = slog.Level(12)
-)
+// LevelTrace sits below slog.LevelDebug for the noisiest diagnostics.
+const LevelTrace = slog.Level(-8)
 
 var levelNames = map[slog.Leveler]string{
 	LevelTrace: "TRACE",
-	LevelFatal: "FATAL",
 }
 
-// renameLevels renders the custom TRACE/FATAL levels with their names instead
-// of slog's numeric fallback (e.g. "DEBUG-4").
+// ErrUnknownLevel reports a level name ParseLevel does not recognise.
+var ErrUnknownLevel = errors.New("unknown log level")
+
+// ParseLevel turns a level name into a slog.Level, case-insensitively.
+// It accepts trace, debug, info, warn and error, and returns an error for
+// anything else so the caller applies its own default.
+func ParseLevel(name string) (slog.Level, error) {
+	switch strings.ToLower(strings.TrimSpace(name)) {
+	case "trace":
+		return LevelTrace, nil
+	case "debug":
+		return slog.LevelDebug, nil
+	case "info":
+		return slog.LevelInfo, nil
+	case "warn", "warning":
+		return slog.LevelWarn, nil
+	case "error":
+		return slog.LevelError, nil
+	}
+	return 0, fmt.Errorf("failed to parse log level %q: %w", name, ErrUnknownLevel)
+}
+
+// renameLevels renders the custom TRACE level with its name instead of slog's
+// numeric fallback (e.g. "DEBUG-4").
 func renameLevels(_ []string, a slog.Attr) slog.Attr {
 	if a.Key != slog.LevelKey {
 		return a
@@ -70,76 +86,54 @@ func HandlerOptions(level slog.Leveler) *slog.HandlerOptions {
 type Option func(*builder)
 
 type builder struct {
-	level   *slog.LevelVar
-	outputs []func(*slog.LevelVar) slog.Handler
-	filters []Filter
+	outputs []slog.Handler
 }
 
-// WithText adds a text handler writing to w.
+// WithText adds a text handler writing to w at the process-wide level.
 func WithText(w io.Writer) Option {
 	return func(b *builder) {
-		b.outputs = append(b.outputs, func(lv *slog.LevelVar) slog.Handler {
-			return slog.NewTextHandler(w, HandlerOptions(lv))
-		})
+		b.outputs = append(b.outputs, slog.NewTextHandler(w, HandlerOptions(level)))
 	}
 }
 
-// WithJSON adds a JSON handler writing to w. Pass a rotating writer (e.g. a
-// lumberjack.Logger) here to keep that dependency out of this module.
+// WithJSON adds a JSON handler writing to w at the process-wide level.
+// Pass a rotating writer (e.g. a lumberjack.Logger) here to keep that dependency
+// out of this module.
 func WithJSON(w io.Writer) Option {
 	return func(b *builder) {
-		b.outputs = append(b.outputs, func(lv *slog.LevelVar) slog.Handler {
-			return slog.NewJSONHandler(w, HandlerOptions(lv))
-		})
+		b.outputs = append(b.outputs, slog.NewJSONHandler(w, HandlerOptions(level)))
 	}
 }
 
 // WithOutput adds an arbitrary slog.Handler (a memory sink, an exporter, ...).
-// The handler controls its own level; WithLevel does not affect it.
+// The handler carries whatever level it was built with, so Level describes it
+// only when it was built with HandlerOptions(log.Level()).
 func WithOutput(h slog.Handler) Option {
-	return func(b *builder) {
-		b.outputs = append(b.outputs, func(*slog.LevelVar) slog.Handler { return h })
-	}
+	return func(b *builder) { b.outputs = append(b.outputs, h) }
 }
 
-// WithLevel sets the minimum level for the Text and JSON outputs (default Debug).
-func WithLevel(level slog.Level) Option {
-	return func(b *builder) { b.level.Set(level) }
+// WithLevel sets the process-wide level, the same one SetLevel moves and Level
+// reports. There is one level for the whole process, so building a logger with
+// this option changes what every other logger from this package emits.
+func WithLevel(l slog.Level) Option {
+	return func(*builder) { SetLevel(l) }
 }
 
-// WithFilters wraps the assembled outputs in a FilterHandler.
-func WithFilters(filters ...Filter) Option {
-	return func(b *builder) { b.filters = append(b.filters, filters...) }
-}
-
-// New assembles a Logger from the given outputs, level, and filters. With no
-// outputs it writes text to stdout at Debug.
+// New assembles a Logger from the given outputs.
+// With no outputs it writes text to stdout.
 func New(opts ...Option) Logger {
-	b := &builder{level: new(slog.LevelVar)}
-	b.level.Set(slog.LevelDebug)
+	b := &builder{}
 	for _, opt := range opts {
 		opt(b)
 	}
 
 	if len(b.outputs) == 0 {
-		b.outputs = append(b.outputs, func(lv *slog.LevelVar) slog.Handler {
-			return slog.NewTextHandler(os.Stdout, HandlerOptions(lv))
-		})
+		b.outputs = append(b.outputs, slog.NewTextHandler(os.Stdout, HandlerOptions(level)))
 	}
 
-	handlers := make([]slog.Handler, len(b.outputs))
-	for i, build := range b.outputs {
-		handlers[i] = build(b.level)
-	}
-
-	var h slog.Handler
-	if len(handlers) == 1 {
-		h = handlers[0]
-	} else {
-		h = NewMultiHandler(handlers...)
-	}
-	if len(b.filters) > 0 {
-		h = NewFilterHandler(h, b.filters...)
+	h := b.outputs[0]
+	if len(b.outputs) > 1 {
+		h = NewMultiHandler(b.outputs...)
 	}
 
 	return Wrap(slog.New(h))
@@ -150,27 +144,34 @@ func Wrap(l *slog.Logger) Logger {
 	return &logger{slog: l}
 }
 
-// Discard returns a Logger that drops every record. Useful as a default in
-// tests or libraries that take a Logger but should stay silent.
+// Discard returns a Logger that drops every record and reports Enabled false at
+// every level, so a caller can hold one instead of guarding a nil logger.
 func Discard() Logger {
 	return Wrap(slog.New(discardHandler{}))
 }
 
 var (
-	mu          sync.RWMutex
-	globalLevel = new(slog.LevelVar)
-	defaultLog  Logger
+	mu    sync.Mutex
+	level = newLevelVar(slog.LevelDebug)
+	// defaultLog is built on first use of Default, so importing this package
+	// opens no writer.
+	defaultLog Logger
 )
 
-func init() {
-	globalLevel.Set(slog.LevelDebug)
-	defaultLog = Wrap(slog.New(slog.NewTextHandler(os.Stdout, HandlerOptions(globalLevel))))
+func newLevelVar(l slog.Level) *slog.LevelVar {
+	lv := new(slog.LevelVar)
+	lv.Set(l)
+	return lv
 }
 
-// Default returns the process-wide Logger backing the package-level helpers.
+// Default returns the process-wide Logger backing the package-level helpers,
+// building a stdout text logger the first time it is asked for one.
 func Default() Logger {
-	mu.RLock()
-	defer mu.RUnlock()
+	mu.Lock()
+	defer mu.Unlock()
+	if defaultLog == nil {
+		defaultLog = Wrap(slog.New(slog.NewTextHandler(os.Stdout, HandlerOptions(level))))
+	}
 	return defaultLog
 }
 
@@ -181,15 +182,15 @@ func SetDefault(l Logger) {
 	defaultLog = l
 }
 
-// SetLevel sets the minimum level of the default logger built in init. It has
-// no effect after SetDefault replaces the default with a logger of your own.
-func SetLevel(level slog.Level) {
-	globalLevel.Set(level)
+// SetLevel moves the process-wide minimum level.
+// Every logger New builds reads this value, so the change applies to all of them.
+func SetLevel(l slog.Level) {
+	level.Set(l)
 }
 
-// Level returns the default logger's minimum level.
+// Level reports the process-wide minimum level.
 func Level() slog.Level {
-	return globalLevel.Level()
+	return level.Level()
 }
 
 // Trace logs at LevelTrace on the default logger.
@@ -206,6 +207,3 @@ func Warn(msg string, args ...any) { Default().Warn(msg, args...) }
 
 // Error logs at slog.LevelError on the default logger.
 func Error(msg string, args ...any) { Default().Error(msg, args...) }
-
-// Fatal logs at LevelFatal on the default logger; it does not exit the process.
-func Fatal(msg string, args ...any) { Default().Fatal(msg, args...) }
