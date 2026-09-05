@@ -38,7 +38,7 @@ var levelNames = map[slog.Leveler]string{
 	LevelTrace: "TRACE",
 }
 
-// ErrUnknownLevel reports a level name ParseLevel does not recognise.
+// ErrUnknownLevel reports a level name ParseLevel does not recognize.
 var ErrUnknownLevel = errors.New("unknown log level")
 
 // ParseLevel turns a level name into a slog.Level, case-insensitively.
